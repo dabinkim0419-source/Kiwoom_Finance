@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -351,6 +351,18 @@ export default function App() {
   const [ksPeriodFilter, setKsPeriodFilter] = useState("1M");
   const [kamPeriodFilter, setKamPeriodFilter] = useState("1M");
 
+  // Hook to detect screen width for responsive design (tablet/mobile under 1024px)
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize(); // trigger initial check
+    window.addEventListener("resize", handleResize);
+    return () => window.removeListener("resize", handleResize);
+  }, []);
+
   // Dynamic Periods (QS) and Company Data based on mode
   const QS = useMemo(() => {
     return periodMode === "quarter" ? financialData.quarters : financialData.years;
@@ -515,7 +527,7 @@ export default function App() {
           <CheckSquare size={18} color={themeColor} />
           <span style={{ fontSize: 15, fontWeight: 700 }}>핵심 계정과목 추이 (실제 데이터)</span>
         </div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="table-container">
           <table className="data-table">
             <thead>
               <tr>
@@ -530,7 +542,7 @@ export default function App() {
                   <tr key={row.period} style={{
                     background: isLatestRow ? "rgba(255,255,255,0.02)" : "transparent"
                   }}>
-                    <td style={{ fontWeight: 700, color: themeColor, whiteSpace: "nowrap" }}>
+                    <td className="sticky-col" style={{ fontWeight: 700, color: themeColor, whiteSpace: "nowrap" }}>
                       {row.period}
                     </td>
                     {keys.map((k, idx2) => (
@@ -554,19 +566,23 @@ export default function App() {
       <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         
         {/* KPI Cards Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(200px, 1fr))", 
+          gap: isMobile ? 12 : 16 
+        }}>
           
           <div className="kpi-card" style={{ "--company-color": "#3b82f6" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 자산총계</span>
+              <span className="kpi-title" style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 자산총계</span>
               <span style={{ background: "rgba(59, 130, 246, 0.1)", padding: 6, borderRadius: 8 }}>
                 <Building2 size={16} color="#3b82f6" />
               </span>
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
+            <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
               {fmt(latestGroupData.자산총계 || 0)}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
+            <div className="kpi-trend" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
               <span style={{ display: "inline-flex", alignItems: "center", color: "#10b981", fontWeight: 600 }}>
                 <TrendingUp size={12} style={{ marginRight: 2 }} />
                 {pct(latestGroupData.자산총계 || 0, prevGroupData.자산총계 || 0)}%
@@ -577,15 +593,15 @@ export default function App() {
 
           <div className="kpi-card" style={{ "--company-color": "#10b981" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 자본총계</span>
+              <span className="kpi-title" style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 자본총계</span>
               <span style={{ background: "rgba(16, 185, 129, 0.1)", padding: 6, borderRadius: 8 }}>
                 <Layers size={16} color="#10b981" />
               </span>
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
+            <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
               {fmt(latestGroupData.자본총계 || 0)}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
+            <div className="kpi-trend" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
               <span style={{ display: "inline-flex", alignItems: "center", color: "#10b981", fontWeight: 600 }}>
                 <TrendingUp size={12} style={{ marginRight: 2 }} />
                 {pct(latestGroupData.자본총계 || 0, prevGroupData.자본총계 || 0)}%
@@ -596,15 +612,15 @@ export default function App() {
 
           <div className="kpi-card" style={{ "--company-color": "#6366f1" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 영업수지/영업수익</span>
+              <span className="kpi-title" style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 영업수지/영업수익</span>
               <span style={{ background: "rgba(99, 102, 241, 0.1)", padding: 6, borderRadius: 8 }}>
                 <DollarSign size={16} color="#6366f1" />
               </span>
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
+            <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
               {fmt(latestGroupData.영업수익 || 0)}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
+            <div className="kpi-trend" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
               <span style={{ display: "inline-flex", alignItems: "center", color: "#10b981", fontWeight: 600 }}>
                 <TrendingUp size={12} style={{ marginRight: 2 }} />
                 {pct(latestGroupData.영업수익 || 0, prevGroupData.영업수익 || 0)}%
@@ -615,15 +631,15 @@ export default function App() {
 
           <div className="kpi-card" style={{ "--company-color": "#a855f7" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 영업이익</span>
+              <span className="kpi-title" style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>그룹 합산 영업이익</span>
               <span style={{ background: "rgba(168, 85, 247, 0.1)", padding: 6, borderRadius: 8 }}>
                 <Activity size={16} color="#a855f7" />
               </span>
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
+            <div className="kpi-value" style={{ fontSize: 24, fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.03em" }}>
               {fmt(latestGroupData.영업이익 || 0)}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
+            <div className="kpi-trend" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12 }}>
               <span style={{ display: "inline-flex", alignItems: "center", color: "#10b981", fontWeight: 600 }}>
                 <TrendingUp size={12} style={{ marginRight: 2 }} />
                 {pct(latestGroupData.영업이익 || 0, prevGroupData.영업이익 || 0)}%
@@ -635,7 +651,7 @@ export default function App() {
         </div>
 
         {/* Charts Section */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 20 }}>
           
           {/* Share Area Chart */}
           <div className="glass-panel" style={{ padding: 24, flex: "1 1 450px" }}>
@@ -701,7 +717,7 @@ export default function App() {
               </span>
             </div>
             
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 20, flex: 1, minHeight: 260 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1.2fr", gap: 20, flex: 1, minHeight: 260 }}>
               {/* KS Chart */}
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#3b82f6", textAlign: "center", marginBottom: 6 }}>
@@ -772,7 +788,7 @@ export default function App() {
         </div>
 
         {/* Group Trends and Ratios */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(400px, 1fr))", gap: 20 }}>
           
           <div className="glass-panel" style={{ padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
@@ -844,7 +860,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
@@ -866,7 +882,7 @@ export default function App() {
                     onClick={() => handleSelectCompany(c.id)}
                     style={{ cursor: "pointer", transition: "background 0.2s" }}
                   >
-                    <td style={{ fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>
+                    <td className="sticky-col" style={{ fontWeight: 600, color: c.color, whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />
                         {c.fullName}
@@ -906,7 +922,7 @@ export default function App() {
                 {/* Subtotal Aggregate Row */}
                 {searchTerm === "" && (
                   <tr style={{ background: "rgba(15, 23, 42, 0.4)", fontWeight: 700 }}>
-                    <td style={{ color: "#e2e8f0", whiteSpace: "nowrap" }}>합 계 (8개사 총괄)</td>
+                    <td className="sticky-col" style={{ color: "#e2e8f0", whiteSpace: "nowrap" }}>합 계 (8개사 총괄)</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(latestGroupData.자산총계 || 0)}</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(latestGroupData.부채총계 || 0)}</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(latestGroupData.자본총계 || 0)}</td>
@@ -1000,15 +1016,19 @@ export default function App() {
         </div>
 
         {/* Detailed KPI Card Widgets */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(180px, 1fr))", 
+          gap: isMobile ? 12 : 16 
+        }}>
           {kpiMetrics.map((k) => (
             <div key={k.label} className="kpi-card" style={{ "--company-color": k.sub ? "rgba(255,255,255,0.1)" : themeColor }}>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6, fontWeight: 500, letterSpacing: "0.03em" }}>{k.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: k.sub ? "#64748b" : "#f8fafc", letterSpacing: "-0.02em" }}>
+              <div className="kpi-title" style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6, fontWeight: 500, letterSpacing: "0.03em" }}>{k.label}</div>
+              <div className="kpi-value" style={{ fontSize: 22, fontWeight: 700, color: k.sub ? "#64748b" : "#f8fafc", letterSpacing: "-0.02em" }}>
                 {k.value}
               </div>
               {k.change !== null && k.change !== undefined && (
-                <div style={{
+                <div className="kpi-trend" style={{
                   fontSize: 11,
                   marginTop: 6,
                   color: parseFloat(k.change) >= 0 ? (k.label === "부채비율" || k.label === "부채총계" ? "#f59e0b" : "#10b981") : "#ef4444",
@@ -1026,12 +1046,12 @@ export default function App() {
           ))}
         </div>
 
-        {/* Charts Row (Supports 3 columns for core companies) */}
+        {/* Charts Row */}
         <div style={{ 
           display: "grid", 
-          gridTemplateColumns: ["KS", "KAM", "KSB", "KYSB"].includes(companyId) 
-            ? "repeat(auto-fit, minmax(350px, 1fr))" 
-            : "repeat(auto-fit, minmax(400px, 1fr))", 
+          gridTemplateColumns: isMobile 
+            ? "1fr" 
+            : (["KS", "KAM", "KSB", "KYSB"].includes(companyId) ? "1fr 1fr 1fr" : "1fr 1fr"), 
           gap: 20 
         }}>
           
@@ -1222,14 +1242,18 @@ export default function App() {
         </div>
 
         {/* Detailed Table & Dynamic Core Accounts Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 20 }}>
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(400px, 1fr))", 
+          gap: 20 
+        }}>
           
           {/* Detailed Statement Table */}
           <div className="glass-panel" style={{ overflow: "hidden" }}>
             <div style={{ padding: "18px 24px", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}>
               <span style={{ fontSize: 15, fontWeight: 700 }}>주요 지표 상세</span>
             </div>
-            <div style={{ overflowX: "auto" }}>
+            <div className="table-container">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -1251,7 +1275,7 @@ export default function App() {
                       <tr key={row.period} style={{
                         background: isLatestRow ? "rgba(255,255,255,0.02)" : "transparent"
                       }}>
-                        <td style={{ fontWeight: 700, color: themeColor, whiteSpace: "nowrap" }}>
+                        <td className="sticky-col" style={{ fontWeight: 700, color: themeColor, whiteSpace: "nowrap" }}>
                           <div>{row.period}</div>
                           {isLatestRow && (
                             <div style={{
@@ -1364,7 +1388,15 @@ export default function App() {
         zIndex: 50,
         padding: "16px 24px"
       }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ 
+          maxWidth: 1400, 
+          margin: "0 auto", 
+          display: "flex", 
+          flexDirection: isMobile ? "column" : "row", 
+          alignItems: isMobile ? "stretch" : "center", 
+          justifyContent: "space-between", 
+          gap: 16 
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{
               background: "linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)",
@@ -1383,7 +1415,12 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ 
+            display: "flex", 
+            flexDirection: isMobile ? "column" : "row", 
+            alignItems: isMobile ? "stretch" : "center", 
+            gap: 12 
+          }}>
             {/* Calendar display */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a3b8", background: "rgba(255,255,255,0.03)", padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.05)" }}>
               <Calendar size={12} />
@@ -1391,10 +1428,11 @@ export default function App() {
             </div>
 
             {/* Segmented Period Toggle */}
-            <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="toggle-group" style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, border: "1px solid rgba(255,255,255,0.06)" }}>
               <button
                 onClick={() => setPeriodMode("quarter")}
                 style={{
+                  flex: isMobile ? 1 : "initial",
                   padding: "6px 12px",
                   fontSize: 11,
                   fontWeight: periodMode === "quarter" ? 600 : 400,
@@ -1411,6 +1449,7 @@ export default function App() {
               <button
                 onClick={() => setPeriodMode("year")}
                 style={{
+                  flex: isMobile ? 1 : "initial",
                   padding: "6px 12px",
                   fontSize: 11,
                   fontWeight: periodMode === "year" ? 600 : 400,
@@ -1426,34 +1465,36 @@ export default function App() {
               </button>
             </div>
             
-            <button
-              onClick={handlePrint}
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8,
-                padding: "7px 12px",
-                color: "#e2e8f0",
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
-            >
-              <Printer size={13} />
-              <span>인쇄/보고서 저장</span>
-            </button>
+            {!isMobile && (
+              <button
+                onClick={handlePrint}
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  padding: "7px 12px",
+                  color: "#e2e8f0",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.2s"
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+              >
+                <Printer size={13} />
+                <span>인쇄/보고서 저장</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Tab Bar */}
-      <nav style={{
+      <nav className="tab-bar" style={{
         background: "rgba(15, 23, 42, 0.4)",
         borderBottom: "1px solid rgba(255, 255, 255, 0.04)"
       }}>
@@ -1495,7 +1536,7 @@ export default function App() {
         maxWidth: 1400,
         width: "100%",
         margin: "0 auto",
-        padding: "24px 24px 60px",
+        padding: isMobile ? "16px 16px 40px" : "24px 24px 60px",
         boxSizing: "border-box"
       }}>
         {activeTab === "summary" ? renderSummaryTab() : renderDetailTab(activeTab)}
@@ -1505,12 +1546,12 @@ export default function App() {
       <footer style={{
         background: "#030712",
         borderTop: "1px solid rgba(255, 255, 255, 0.04)",
-        padding: "24px 0",
+        padding: "24px 16px",
         color: "#475569",
         fontSize: 11,
         textAlign: "center"
       }}>
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
           <Info size={12} />
           <span>본 대시보드의 데이터는 각 계열사의 실제 분기/연간 공시 보고서 및 실적 자료를 API로 수집하여 실시간 정제 및 반영하였습니다.</span>
         </div>

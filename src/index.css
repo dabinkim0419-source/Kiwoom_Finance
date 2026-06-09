@@ -147,3 +147,45 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 1024px) {
+  body {
+    background: #060913 !important;
+  }
+
+  .glass-panel {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .kpi-card {
+    padding: 14px 16px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Sticky first column for mobile table readability */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table th:first-child,
+  .data-table td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    background: #111827 !important; /* solid background color to mask underlying data */
+    z-index: 5 !important;
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  .data-table tr:hover td:first-child {
+    background: #1f2937 !important;
+  }
+
+  .data-table th, .data-table td {
+    padding: 10px 12px !important;
+    font-size: 11px !important;
+  }
+}
+
