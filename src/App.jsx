@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell
+  ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell,
+  ComposedChart, LabelList
 } from "recharts";
 import {
   Building2,
@@ -70,7 +71,20 @@ const isPercent = (name) => {
     name.includes("ROE") ||
     name.includes("NPL") ||
     name.includes("점유율") ||
-    name.includes("연체율")
+    name.includes("연체율") ||
+    name.includes("M/S") ||
+    name.includes("MS")
+  );
+};
+
+// Custom Label for Asset Stacked Bar Chart
+const renderCustomBarLabel = (props) => {
+  const { x, y, width, value } = props;
+  if (value === undefined || value === null || value === 0) return null;
+  return (
+    <text x={x + width / 2} y={y - 8} fill="#f8fafc" fontSize={10} fontWeight={600} textAnchor="middle">
+      {fmt(value)}
+    </text>
   );
 };
 
@@ -966,6 +980,11 @@ export default function App() {
       부채비율: +debtRatio(d),
     }));
 
+    const assetTrendData = rawData.map((d) => ({
+      ...d,
+      부채비율: +debtRatio(d),
+    }));
+
     const kpiMetrics = subTab === "bs"
       ? [
           { label: "자산총계", value: fmt(latest.자산총계 || 0), raw: latest.자산총계, change: pct(latest.자산총계, prev.자산총계) },
@@ -1241,134 +1260,218 @@ export default function App() {
 
         </div>
 
-        {/* Detailed Table & Dynamic Core Accounts Row */}
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(400px, 1fr))", 
-          gap: 20 
-        }}>
-          
-          {/* Detailed Statement Table */}
-          <div className="glass-panel" style={{ overflow: "hidden" }}>
-            <div style={{ padding: "18px 24px", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}>
-              <span style={{ fontSize: 15, fontWeight: 700 }}>주요 지표 상세</span>
-            </div>
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left" }}>기간</th>
-                    <th>자산총계</th>
-                    <th>부채총계</th>
-                    <th>자본총계</th>
-                    <th>부채비율</th>
-                    <th>영업수지/<br />영업수익</th>
-                    <th>영업이익</th>
-                    <th>ROE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...rawData].reverse().map((row, idx) => {
-                    const r = +roe(row);
-                    const isLatestRow = idx === 0;
-                    return (
-                      <tr key={row.period} style={{
-                        background: isLatestRow ? "rgba(255,255,255,0.02)" : "transparent"
-                      }}>
-                        <td className="sticky-col" style={{ fontWeight: 700, color: themeColor, whiteSpace: "nowrap" }}>
-                          <div>{row.period}</div>
-                          {isLatestRow && (
-                            <div style={{
-                              display: "inline-block",
-                              marginTop: 4,
-                              fontSize: 9,
-                              background: themeColor,
-                              color: "#fff",
-                              padding: "1px 6px",
-                              borderRadius: 4,
-                              fontWeight: 600,
-                              letterSpacing: "0.05em"
-                            }}>
-                              LATEST
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.자산총계 || 0)}</td>
-                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.부채총계 || 0)}</td>
-                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.자본총계 || 0)}</td>
-                        <td style={{ textAlign: "right", color: "#f59e0b", fontWeight: 600, whiteSpace: "nowrap" }}>{debtRatio(row)}%</td>
-                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.영업수익 || 0)}</td>
-                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.영업이익 || 0)}</td>
-                        <td style={{
-                          textAlign: "right",
-                          fontWeight: 700,
-                          color: r >= 12 ? "#10b981" : r >= 6 ? "#f59e0b" : "#ef4444",
-                          whiteSpace: "nowrap"
-                        }}>
-                          {r.toFixed(1)}%
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Dynamic Core Accounts or Mockup Card */}
-          {hasCoreTable ? (
-            renderCoreAccountsTable(companyId, rawData, themeColor)
-          ) : (
+        {/* Detailed Table & Dynamic Core Accounts Row or KS 3-Charts Summary */}
+        {companyId === "KS" ? (
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", 
+            gap: 20 
+          }}>
+            {/* 자산 추이 */}
             <div className="glass-panel" style={{ padding: 24, display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-                <CheckSquare size={18} color={themeColor} />
-                <span style={{ fontSize: 15, fontWeight: 700 }}>
-                  {industrySpecific.title}
-                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
-                    ({latest.period} 최신 기준)
-                  </span>
-                </span>
+                <Activity size={18} color={themeColor} />
+                <span style={{ fontSize: 15, fontWeight: 700 }}>자산 추이 (부채/자본 적층 및 부채비율)</span>
               </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 20, flex: 1, justifyContent: "center" }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: themeColor, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 6 }}>
-                    재무상태표 (B/S) 관련 지표
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {industrySpecific.bs.map((acc, index) => (
-                      <div key={index}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: "#cbd5e1" }}>{acc.name}</span>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{fmt(acc.value)}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{acc.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 6 }}>
-                    손익계산서 (I/S) 관련 지표
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {industrySpecific.pl.map((acc, index) => (
-                      <div key={index}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: "#cbd5e1" }}>{acc.name}</span>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{fmt(acc.value)}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{acc.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div style={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={assetTrendData} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis dataKey="period" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={fmt} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={v => `${v}%`} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                    <Bar dataKey="부채총계" stackId="a" fill="#f59e0b" fillOpacity={0.85} name="부채총계" />
+                    <Bar dataKey="자본총계" stackId="a" fill="#10b981" fillOpacity={0.85} name="자본총계">
+                      <LabelList dataKey="자산총계" content={renderCustomBarLabel} />
+                    </Bar>
+                    <Line yAxisId="right" type="monotone" dataKey="부채비율" stroke="#ef4444" strokeWidth={2} name="부채비율" dot={{ r: 3 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
             </div>
-          )}
 
-        </div>
+            {/* 브로커리지 추이 */}
+            <div className="glass-panel" style={{ padding: 24, display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+                <TrendingUp size={18} color="#06b6d4" />
+                <span style={{ fontSize: 15, fontWeight: 700 }}>브로커리지 추이 (M/S 및 거래약정/평잔)</span>
+              </div>
+              <div style={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={rawData} margin={{ top: 15, right: -5, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis dataKey="period" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                    <YAxis yAxisId="left" tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={v => `${v}%`} domain={[0, 60]} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={fmt} domain={[0, 450000]} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
+                    
+                    {/* Bars (Right Y-Axis) */}
+                    <Bar yAxisId="right" dataKey="고객예탁금평잔" fill="#10b981" fillOpacity={0.75} radius={[3, 3, 0, 0]} name="고객예탁금 평잔" />
+                    <Bar yAxisId="right" dataKey="신용공여평잔" fill="#f59e0b" fillOpacity={0.75} radius={[3, 3, 0, 0]} name="신용공여 평잔" />
+                    <Bar yAxisId="right" dataKey="해외주식약정" fill="#06b6d4" fillOpacity={0.75} radius={[3, 3, 0, 0]} name="해외주식 일평균 약정" />
+                    
+                    {/* Lines (Left Y-Axis) */}
+                    <Line yAxisId="left" type="monotone" dataKey="국내주식MS" stroke="#3b82f6" strokeWidth={2.5} name="국내주식 M/S" dot={{ r: 3 }} />
+                    <Line yAxisId="left" type="monotone" dataKey="RetailMS" stroke="#ec4899" strokeWidth={2.5} name="Retail M/S" dot={{ r: 3 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* 세부 손익 추이 */}
+            <div className="glass-panel" style={{ padding: 24, display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+                <DollarSign size={18} color="#10b981" />
+                <span style={{ fontSize: 15, fontWeight: 700 }}>세부 손익 추이 (수수료/이자/운용)</span>
+              </div>
+              <div style={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={rawData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis dataKey="period" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={fmt} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                    <Line type="monotone" dataKey="수수료손익" stroke="#8b5cf6" strokeWidth={2} name="수수료손익" dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="이자손익" stroke="#f59e0b" strokeWidth={2} name="이자손익" dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="운용손익" stroke="#10b981" strokeWidth={2} name="운용손익" dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(400px, 1fr))", 
+            gap: 20 
+          }}>
+            
+            {/* Detailed Statement Table */}
+            <div className="glass-panel" style={{ overflow: "hidden" }}>
+              <div style={{ padding: "18px 24px", borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}>
+                <span style={{ fontSize: 15, fontWeight: 700 }}>주요 지표 상세</span>
+              </div>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left" }}>기간</th>
+                      <th>자산총계</th>
+                      <th>부채총계</th>
+                      <th>자본총계</th>
+                      <th>부채비율</th>
+                      <th>영업수지/<br />영업수익</th>
+                      <th>영업이익</th>
+                      <th>ROE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...rawData].reverse().map((row, idx) => {
+                      const r = +roe(row);
+                      const isLatestRow = idx === 0;
+                      return (
+                        <tr key={row.period} style={{
+                          background: isLatestRow ? "rgba(255,255,255,0.02)" : "transparent"
+                        }}>
+                          <td className="sticky-col" style={{ fontWeight: 700, color: themeColor, whiteSpace: "nowrap" }}>
+                            <div>{row.period}</div>
+                            {isLatestRow && (
+                              <div style={{
+                                display: "inline-block",
+                                marginTop: 4,
+                                fontSize: 9,
+                                background: themeColor,
+                                color: "#fff",
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                fontWeight: 600,
+                                letterSpacing: "0.05em"
+                              }}>
+                                LATEST
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.자산총계 || 0)}</td>
+                          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.부채총계 || 0)}</td>
+                          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.자본총계 || 0)}</td>
+                          <td style={{ textAlign: "right", color: "#f59e0b", fontWeight: 600, whiteSpace: "nowrap" }}>{debtRatio(row)}%</td>
+                          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.영업수익 || 0)}</td>
+                          <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(row.영업이익 || 0)}</td>
+                          <td style={{
+                            textAlign: "right",
+                            fontWeight: 700,
+                            color: r >= 12 ? "#10b981" : r >= 6 ? "#f59e0b" : "#ef4444",
+                            whiteSpace: "nowrap"
+                          }}>
+                            {r.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Dynamic Core Accounts or Mockup Card */}
+            {hasCoreTable ? (
+              renderCoreAccountsTable(companyId, rawData, themeColor)
+            ) : (
+              <div className="glass-panel" style={{ padding: 24, display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+                  <CheckSquare size={18} color={themeColor} />
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>
+                    {industrySpecific.title}
+                    <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
+                      ({latest.period} 최신 기준)
+                    </span>
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 20, flex: 1, justifyContent: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: themeColor, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 6 }}>
+                      재무상태표 (B/S) 관련 지표
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {industrySpecific.bs.map((acc, index) => (
+                        <div key={index}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: "#cbd5e1" }}>{acc.name}</span>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{fmt(acc.value)}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>{acc.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 6 }}>
+                      손익계산서 (I/S) 관련 지표
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {industrySpecific.pl.map((acc, index) => (
+                        <div key={index}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: "#cbd5e1" }}>{acc.name}</span>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{fmt(acc.value)}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>{acc.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
 
       </div>
     );
