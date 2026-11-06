@@ -139,7 +139,7 @@ body.fs-land-on { overflow: hidden; }
 .fs-icon-btn:hover, .fs-icon-btn.on { color: var(--accent); border-color: var(--accent); }
 
 /* ── Grid ── */
-.fs-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; padding: 20px 24px 10px; align-items: start; }
+.fs-grid { display: grid; grid-template-columns: minmax(0, 1fr) 256px; gap: 16px; padding: 20px 24px 10px; align-items: start; }
 .fs-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .fs-right { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 
@@ -219,6 +219,48 @@ body.fs-land-on { overflow: hidden; }
 .fs-hbars-legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--c); margin-right: 4px; vertical-align: -1px; }
 .fs-hbars-legend .sw.outline { background: transparent; border: 1.5px solid var(--c); }
 
+/* 계열사별 목표 달성률 컬럼 차트 (금융 통합) — KS 좌축 / KS 외 우축 */
+.fs-rc { height: 250px; display: flex; flex-direction: column; }
+.fs-rc-cols { flex: 1; min-height: 0; display: grid; }
+.fs-rc-col { display: flex; flex-direction: column; min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.fs-rc-col:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.fs-rc-col.split { border-right: 1px dashed var(--border-strong); background: color-mix(in srgb, var(--c-plan) 4%, transparent); }
+.fs-rc-area { position: relative; flex: 1; min-height: 0; --pair-w: min(72%, 52px); }
+.fs-rc-pair { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: var(--pair-w); }
+.fs-rc-bar { position: absolute; display: block; width: calc(50% - 1.5px); box-sizing: border-box; transition: height 1.6s cubic-bezier(.22, 1, .36, 1), bottom 1.6s cubic-bezier(.22, 1, .36, 1); }
+.fs-rc-bar.tgt { left: 0; background: var(--tgt-bg); border: 1.5px solid var(--c-plan); border-bottom: 0; border-radius: 3px 3px 0 0; }
+.fs-rc-bar.act { right: 0; background: var(--c-act); border-radius: 3px 3px 0 0; }
+.fs-rc-bar.tgt.neg { border: 1.5px solid var(--c-plan); border-top: 0; border-radius: 0 0 3px 3px; }
+.fs-rc-bar.act.neg { background: transparent; border: 1.5px solid var(--c-act); border-top: 0; border-radius: 0 0 3px 3px; }
+.fs-rc-bar.cum { left: 1.5px; width: calc(50% - 4.5px); background: var(--c-plan); opacity: .8; border-radius: 1px 1px 0 0; }
+.fs-rc-bar.cum.neg { border-radius: 0 0 1px 1px; }
+.fs-rc-bar.z { border-color: transparent; background: transparent; }
+.fs-rc-base { position: absolute; left: 0; right: 0; height: 1px; background: var(--border-strong); }
+.fs-rc-goal { position: absolute; left: 7%; right: 7%; border-top: 1.5px dashed var(--c-plan); transform: translateY(0.75px); transition: opacity .8s ease; pointer-events: none; }
+/* 라벨:   달성률 / [목표 | 실적] — 두 숫자는 각 막대 위에 정렬 */
+.fs-rc-lab {
+  position: absolute; left: 50%; transform: translateX(-50%); width: calc(var(--pair-w) + 16px);
+  display: flex; flex-direction: column; align-items: center; line-height: 1.2; white-space: nowrap;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.3px; pointer-events: none;
+  transition: bottom 1.6s cubic-bezier(.22, 1, .36, 1), opacity .9s ease;
+}
+.fs-rc-lab b { font-size: 11px; font-weight: 800; }
+.fs-rc-lab-row { display: flex; width: 100%; font-size: 9.5px; }
+.fs-rc-lab-row > span { flex: 1 1 0; display: flex; justify-content: center; min-width: 0; }
+.fs-rc-lab .t { color: var(--c-plan); }
+.fs-rc-lab .a { color: var(--c-act); font-weight: 700; }
+.fs-rc-lab .a.neg { color: var(--neg); }
+.fs-rc-name { height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-2); }
+.fs-rc-axis { display: flex; flex-direction: column; min-width: 0; }
+.fs-rc-tick { position: absolute; transform: translateY(50%); font-size: 9.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; line-height: 1; }
+.fs-rc-axis.l .fs-rc-tick { right: 5px; }
+.fs-rc-axis.r .fs-rc-tick { left: 5px; }
+.fs-rc-cap { position: absolute; top: 2px; font-size: 9.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.fs-rc-axis.l .fs-rc-cap { right: 5px; }
+.fs-rc-axis.r .fs-rc-cap { left: 5px; }
+.fs-rc-legend { margin-top: 6px; }
+.fs-hbars-legend .sw.dash { background: transparent; height: 0; border-top: 1.5px dashed var(--c); border-radius: 0; vertical-align: 3px; }
+
 /* ── Progress (짙은 회색 톤) ── */
 .fs-progress { position: relative; height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .fs-progress-bar { height: 100%; border-radius: 999px; background: var(--ink); transition: width 1.6s cubic-bezier(.22, 1, .36, 1); }
@@ -286,7 +328,7 @@ b.neutral, td.rate.neutral { color: var(--muted); }
   .fs-chart-row { grid-template-columns: 1fr; }
   .fs-root { flex-direction: column; }
 
-  /* 최상단: 브랜드 + 가로화면 버튼 / 아래 줄: 마키 메뉴 */
+  /* 최상단: 브랜드 + 가로화면 버튼 / 아래: 2줄 고정 메뉴 */
   .fs-side { position: static; width: 100%; height: auto; padding: 10px 0 8px; border-right: none; border-bottom: 1px solid var(--border); }
   .fs-brand { padding: 0 14px 8px; }
   .fs-brand-sub { display: none; }
@@ -325,9 +367,20 @@ b.neutral, td.rate.neutral { color: var(--muted); }
   .fs-cell { padding: 10px 8px 8px 6px; }
   .fs-cell .fs-chart-head, .fs-cell .fs-hbars { padding-left: 6px; }
   .fs-chart { height: 220px; }
+  .fs-rc { height: 240px; }
+  .fs-rc-area { --pair-w: min(80%, 28px); }
+  .fs-rc-bar { width: calc(50% - 1px); }
+  .fs-rc-bar.cum { width: calc(50% - 4px); }
+  .fs-rc-tick, .fs-rc-cap { font-size: 8.5px; letter-spacing: -0.3px; }
+  .fs-rc-axis.l .fs-rc-tick, .fs-rc-axis.l .fs-rc-cap { right: 3px; }
+  .fs-rc-axis.r .fs-rc-tick, .fs-rc-axis.r .fs-rc-cap { left: 3px; }
+  .fs-rc-lab { width: calc(var(--pair-w) + 10px); letter-spacing: -0.5px; }
+  .fs-rc-lab b { font-size: 9px; }
+  .fs-rc-lab-row { font-size: 7.5px; }
+  .fs-rc-name { font-size: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .fs-panel { animation: none; }
-  .fs-hbar-fill, .fs-hbar-inner, .fs-progress-bar { transition: none; }
+  .fs-hbar-fill, .fs-hbar-inner, .fs-progress-bar, .fs-rc-bar, .fs-rc-lab, .fs-rc-goal { transition: none; }
 }

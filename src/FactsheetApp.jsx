@@ -85,7 +85,7 @@ function buildAxis(values, compress) {
   for (let t = 0; t <= top + 1e-9; t += step) posTicks.push(Math.round(t * 1000) / 1000);
   return on
     ? { f, compress: true, ticks: [-band, ...posTicks], domain: [-band, top], negTickRaw, breakY: -band / 2 }
-    : { f, compress: false, ticks: undefined, domain: ["auto", "auto"] };
+    : { f, compress: false, ticks: undefined, domain: [min < 0 ? "auto" : 0, "auto"] }; // 막대는 0부터 시작
 }
 
 // 회사별 / 그룹 합산 시리즈 (억원 단위)
@@ -278,6 +278,90 @@ const AxisBreak = ({ yAxisMap, offset, y, bg, stroke, axisW = 58 }) => {
       <path d={wave(-gap / 2)} fill="none" stroke={stroke} strokeWidth={1} />
       <path d={wave(gap / 2)} fill="none" stroke={stroke} strokeWidth={1} />
     </g>
+  );
+};
+
+// 계열사별 목표 달성률 컬럼 차트 — 실제 금액 기준, KS는 좌축 / KS 외는 우축(공통 축)
+//  · 막대: 연간 목표(테두리) + 안쪽 누적 목표(채움) · 누적 실적(분홍), 각 계열사 칸에 연간 목표 높이 점선
+//  · 막대 위 라벨:        달성률
+//                    목표 숫자 | 실적 숫자   (각 막대 위에 정렬)
+//  · 적자는 기준선 아래 빈 테두리 막대 / 두 축의 0(기준선) 위치는 동일
+const fmtJoTick = (v) => (v === 0 ? "0" : `${(v / 10000).toFixed(1)}조`);
+const fmtEokTick = (v) => (v === 0 ? "0" : `${Math.round(v).toLocaleString("ko-KR")}억`);
+const RateColumns = ({ items, planColor, actColor, narrow, onPick, splitId = "KS" }) => {
+  const shown = useReveal(items.map((i) => `${i.id}:${i.plan}:${i.cum}:${i.actual}`).join("|"));
+  const LABEL = narrow ? 28 : 34;                      // 막대 위 라벨(2줄) 영역 px
+  const AXW = narrow ? 30 : 42;                        // 축 눈금 폭 px
+  const scaleOf = (arr) => {
+    const v = arr.flatMap((i) => [i.plan, i.cum, i.actual]).filter((x) => Number.isFinite(x));
+    const mx = Math.max(0, ...v), mn = Math.min(0, ...v);
+    let step = niceStep(mx / 4);
+    if (Math.ceil(mx / step) * step > mx * 1.35) step /= 2;   // 위쪽 빈 공간 과다 방지
+    return { top: Math.ceil(mx / step) * step || step, step, neg: -mn };
+  };
+  const K = scaleOf(items.filter((i) => i.id === splitId));
+  const A = scaleOf(items.filter((i) => i.id !== splitId));
+  const negR = Math.max(A.neg / A.top, K.neg / K.top);   // 음수 영역 비율(양 축 공통)
+  const z = negR / (1 + negR);                            // 기준선 위치(사용 높이 대비)
+  const axisOf = (id) => (id === splitId ? K : A);
+  const fr = (v, X) => (v || 0) / (X.top * (1 + negR));
+  const U = (f) => `calc((100% - ${LABEL}px) * ${f.toFixed(4)})`;
+  const Uplus = (f, px) => `calc(${U(f).slice(5, -1)} + ${px}px)`;
+  // 모바일은 칸이 좁아 단위 생략(KS는 조, 그 외는 억 — 축 단위와 동일)
+  const lab = (v) => (narrow ? fmtEok(v).replace(/[억조]/, "") : fmtEok(v));
+  const ticks = (X) => { const t = []; for (let v = 0; v <= X.top + 1e-9; v += X.step) t.push(v); return t; };
+  const axisCol = (X, side, cap, fmt) => (
+    <div className={`fs-rc-axis ${side}`}>
+      <div className="fs-rc-area">
+        <span className="fs-rc-cap">{cap}</span>
+        {ticks(X).map((t) => <span key={t} className="fs-rc-tick" style={{ bottom: U(z + fr(t, X)) }}>{fmt(t)}</span>)}
+      </div>
+      <div className="fs-rc-name" />
+    </div>
+  );
+  const bar = (v, X, cls, delay) => {
+    const f = fr(v, X);
+    const neg = f < 0;
+    return (
+      <i className={`fs-rc-bar ${cls} ${neg ? "neg" : ""} ${f === 0 ? "z" : ""}`}
+        style={{ bottom: shown ? U(z + Math.min(0, f)) : U(z), height: shown ? U(Math.abs(f)) : 0, transitionDelay: `${delay}ms` }} />
+    );
+  };
+  return (
+    <div className="fs-rc" style={{ "--c-plan": planColor, "--c-act": actColor }}>
+      <div className="fs-rc-cols" style={{ gridTemplateColumns: `${AXW}px repeat(${items.length}, minmax(0, 1fr)) ${AXW}px` }}>
+        {axisCol(K, "l", splitId, fmtJoTick)}
+        {items.map((i, k) => {
+          const X = axisOf(i.id);
+          const d = k * 90;
+          const rateTxt = i.ratio === null ? (narrow ? i.st.label.replace("목표 ", "") : i.st.label) : fmtPct(i.ratio, 0);
+          const topF = Math.max(0, fr(i.plan, X), fr(i.cum, X), fr(i.actual, X));
+          return (
+            <button key={i.id} className={`fs-rc-col ${i.id === splitId ? "split" : ""}`} onClick={() => onPick(i.id)}
+              title={`${i.id} · 연간 목표 ${fmtEok(i.plan)} · 누적 목표 ${fmtEok(i.cum)} · 누적 실적 ${fmtEok(i.actual)} · ${rateTxt}`}>
+              <div className="fs-rc-area">
+                <div className="fs-rc-base" style={{ bottom: U(z) }} />
+                <div className="fs-rc-pair">
+                  {bar(i.plan, X, "tgt", d)}
+                  {bar(i.cum, X, "cum", d + 250)}
+                  {bar(i.actual, X, "act", d + ANIM.chartLag)}
+                </div>
+                <div className="fs-rc-goal" style={{ bottom: U(z + fr(i.plan, X)), opacity: shown ? 1 : 0, transitionDelay: `${d + 600}ms` }} />
+                <div className="fs-rc-lab" style={{ bottom: shown ? Uplus(z + topF, 3) : Uplus(z, 3), opacity: shown ? 1 : 0, transitionDelay: `${d}ms` }}>
+                  <b className={i.st.tone}>{rateTxt}</b>
+                  <div className="fs-rc-lab-row">
+                    <span className="t">{lab(i.plan)}</span>
+                    <span className={`a ${i.actual < 0 ? "neg" : ""}`}>{lab(i.actual)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="fs-rc-name">{i.id}</div>
+            </button>
+          );
+        })}
+        {axisCol(A, "r", `${splitId} 외`, fmtEokTick)}
+      </div>
+    </div>
   );
 };
 
@@ -477,7 +561,8 @@ export default function FactsheetApp() {
     return { list, scale: Math.max(...list.map((l) => Math.abs(l.value)), 1) };
   }, [pk, isLight]);
 
-  // 하이라이트 (금융그룹 최상단 → 특이사항). good = 체크 + 분홍 테두리, bad = 느낌표
+  // 실적 분석 (금융그룹 최상단 → 특이사항). good = 체크 + 분홍 테두리, bad = 느낌표
+  //  ※ 연간 목표 달성은 목표가 양수이고 달성률 100% 이상인 계열사만(적자 목표 '상회'는 제외) — 10월 실적 반영 시 기준 구체화 예정
   const highlights = useMemo(() => {
     const list = [];
     const g = groupRows.p;
@@ -486,9 +571,12 @@ export default function FactsheetApp() {
     if (withRate.length) {
       const sorted = [...withRate].sort((a, b) => b.p.progress - a.p.progress);
       const top = sorted[0], low = sorted[sorted.length - 1];
-      list.push({ good: true, title: `${top.id} 영업이익 연간 목표 대비 ${fmtPct(top.p.progress, 0)} (최고)`, sub: `누적 ${fmtEok(top.p.ytdActual)} · 연간 목표 ${fmtEok(top.p.annualPlan)}` });
-      const achieved = rows.filter((c) => c.ps.tone === "pos").map((c) => c.id);
-      if (achieved.length) list.push({ good: true, title: `연간 목표 달성·상회: ${achieved.join(", ")}`, sub: "상반기 누적 기준 연간 목표 조기 달성(적자 목표는 상회)" });
+      const achieved = rows.filter((c) => c.p.progress !== null && c.p.progress >= 100);
+      if (achieved.length) {
+        list.push({ good: true, title: `영업이익 연간 목표 달성: ${achieved.map((c) => `${c.id} ${fmtPct(c.p.progress, 0)}`).join(", ")}`,
+          sub: achieved.map((c) => `${c.id} 누적 ${fmtEok(c.p.ytdActual)} · 연간 목표 ${fmtEok(c.p.annualPlan)}`).join(" / ") + ` (1~${ASOF_M}월 누적)` });
+      }
+      if (!achieved.some((c) => c.id === top.id)) list.push({ good: true, title: `${top.id} 영업이익 연간 목표 대비 ${fmtPct(top.p.progress, 0)} (최고)`, sub: `누적 ${fmtEok(top.p.ytdActual)} · 연간 목표 ${fmtEok(top.p.annualPlan)}` });
       if (low.id !== top.id) list.push({ good: false, title: `${low.id} 영업이익 연간 목표 대비 ${fmtPct(low.p.progress, 0)} (최저)`, sub: `누적 ${fmtEok(low.p.ytdActual)} · 연간 목표 ${fmtEok(low.p.annualPlan)}` });
     }
     const loss = rows.filter((c) => c.p.ytdActual < 0);
@@ -615,92 +703,123 @@ export default function FactsheetApp() {
     </div>
   );
 
-  const charts = (
-    <>
-      {/* Row 1: 불릿(연간 목표·누적 목표·누적 실적) + 월별 목표 대비 실적 */}
-      <div className="fs-chart-row">
-        <div className="fs-cell">
-          <div className="fs-chart-head"><span className="fs-chart-title">{CUR}년 {mLabel} 목표 대비 실적</span></div>
-          <div className="fs-hbars">
-            <HBar label="연간 목표 · 누적 목표" value={pk.annualPlan} scale={bulletScale} color={C.plan} outline inner={pk.ytdPlan} innerColor={C.plan}
-              valueText={fmtEok(pk.annualPlan)} sub={`누적 목표 ${fmtEok(pk.ytdPlan)} (1~${ASOF_M}월)`} />
-            <HBar label="누적 실적" value={pk.ytdActual} scale={bulletScale} color={C.actual} delay={ANIM.chartLag}
-              sub={`연간 목표 대비 ${pk.progress === null ? statusOf(null, pk.ytdActual, pk.annualPlan).label : fmtPct(pk.progress, 0)} · 누적 목표 대비 ${pk.rateYtd === null ? statusOf(null, pk.ytdActual, pk.ytdPlan).label : fmtPct(pk.rateYtd, 0)}`} />
-            <div className="fs-hbars-legend">
-              <span><i className="sw outline" style={{ "--c": C.plan }} />연간 목표</span>
-              <span><i className="sw" style={{ "--c": C.plan }} />누적 목표</span>
-              <span><i className="sw" style={{ "--c": C.actual }} />누적 실적</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="fs-cell">
-          <div className="fs-chart-head">
-            <span className="fs-chart-title">{CUR}년 월별 {mLabel} — 목표 대비 실적</span>
-            <span className="fs-chart-unit">단위: 억원{monthlyPack.ax.compress ? " · 음수 구간 축약" : ""}</span>
-          </div>
-          <div className="fs-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart key={animKey} data={monthly} margin={{ top: 8, right: narrow ? 2 : 8, left: 0, bottom: 0 }} barGap={narrow ? 1 : 2} barCategoryGap={narrow ? "16%" : "22%"}>
-                <CartesianGrid stroke={C.grid} vertical={false} />
-                <XAxis dataKey="month" tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} interval={0} tickMargin={4} />
-                <YAxis tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} width={axisW}
-                  ticks={monthlyPack.ax.ticks} domain={monthlyPack.ax.domain} tickFormatter={monthAxisFmt} interval={0} />
-                <Tooltip content={<ChartTip />} cursor={{ fill: isLight ? "rgba(24,25,73,0.05)" : "rgba(255,255,255,0.04)" }} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: narrow ? 10 : 11, color: C.tick }} />
-                <ReferenceLine y={0} stroke={C.tick} strokeOpacity={0.5} />
-                {monthlyPack.ax.compress && <Customized component={<AxisBreak y={monthlyPack.ax.breakY} bg={C.cellBg} stroke={C.tick} axisW={axisW} />} />}
-                <Bar dataKey="목표" name="목표" fill={C.plan} radius={2} maxBarSize={18} animationDuration={ANIM.chart} animationEasing="ease-out">
-                  {barCells("목표", C.plan)}
-                </Bar>
-                <Bar dataKey="실적" name="실적" fill={C.actual} radius={2} maxBarSize={18} animationDuration={ANIM.chart} animationBegin={ANIM.chartLag} animationEasing="ease-out">
-                  {barCells("실적", C.actual)}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+  // 차트 셀
+  const bulletCell = (
+    <div className="fs-cell">
+      <div className="fs-chart-head"><span className="fs-chart-title">{CUR}년 {mLabel} 목표 대비 실적</span></div>
+      <div className="fs-hbars">
+        <HBar label="연간 목표 · 누적 목표" value={pk.annualPlan} scale={bulletScale} color={C.plan} outline inner={pk.ytdPlan} innerColor={C.plan}
+          valueText={fmtEok(pk.annualPlan)} sub={`누적 목표 ${fmtEok(pk.ytdPlan)} (1~${ASOF_M}월)`} />
+        <HBar label="누적 실적" value={pk.ytdActual} scale={bulletScale} color={C.actual} delay={ANIM.chartLag}
+          sub={`연간 목표 대비 ${pk.progress === null ? statusOf(null, pk.ytdActual, pk.annualPlan).label : fmtPct(pk.progress, 0)} · 누적 목표 대비 ${pk.rateYtd === null ? statusOf(null, pk.ytdActual, pk.ytdPlan).label : fmtPct(pk.rateYtd, 0)}`} />
+        <div className="fs-hbars-legend">
+          <span><i className="sw outline" style={{ "--c": C.plan }} />연간 목표</span>
+          <span><i className="sw" style={{ "--c": C.plan }} />누적 목표</span>
+          <span><i className="sw" style={{ "--c": C.actual }} />누적 실적</span>
         </div>
       </div>
-
-      {/* Row 2: 연도별 실적 가로막대 + 연도별 월별 추이 */}
-      <div className="fs-chart-row" style={{ marginTop: 16 }}>
-        <div className="fs-cell">
-          <div className="fs-chart-head"><span className="fs-chart-title">연도별 {mLabel}</span></div>
-          <div className="fs-hbars">
-            {yearlyBars.list.map((b, i) => (
-              <HBar key={b.label} label={b.label} value={b.value} scale={yearlyBars.scale} color={b.color} delay={i * ANIM.stagger} />
+    </div>
+  );
+  const monthlyCell = (
+    <div className="fs-cell">
+      <div className="fs-chart-head">
+        <span className="fs-chart-title">{CUR}년 월별 {mLabel} — 목표 대비 실적</span>
+        <span className="fs-chart-unit">단위: 억원{monthlyPack.ax.compress ? " · 음수 구간 축약" : ""}</span>
+      </div>
+      <div className="fs-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart key={animKey} data={monthly} margin={{ top: 8, right: narrow ? 2 : 8, left: 0, bottom: 0 }} barGap={narrow ? 1 : 2} barCategoryGap={narrow ? "16%" : "22%"}>
+            <CartesianGrid stroke={C.grid} vertical={false} />
+            <XAxis dataKey="month" tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} interval={0} tickMargin={4} />
+            <YAxis tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} width={axisW}
+              ticks={monthlyPack.ax.ticks} domain={monthlyPack.ax.domain} tickFormatter={monthAxisFmt} interval={0} />
+            <Tooltip content={<ChartTip />} cursor={{ fill: isLight ? "rgba(24,25,73,0.05)" : "rgba(255,255,255,0.04)" }} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: narrow ? 10 : 11, color: C.tick }} />
+            <ReferenceLine y={0} stroke={C.tick} strokeOpacity={0.5} />
+            {monthlyPack.ax.compress && <Customized component={<AxisBreak y={monthlyPack.ax.breakY} bg={C.cellBg} stroke={C.tick} axisW={axisW} />} />}
+            <Bar dataKey="목표" name="목표" fill={C.plan} radius={2} maxBarSize={18} animationDuration={ANIM.chart} animationEasing="ease-out">
+              {barCells("목표", C.plan)}
+            </Bar>
+            <Bar dataKey="실적" name="실적" fill={C.actual} radius={2} maxBarSize={18} animationDuration={ANIM.chart} animationBegin={ANIM.chartLag} animationEasing="ease-out">
+              {barCells("실적", C.actual)}
+            </Bar>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+  const yearlyCell = (
+    <div className="fs-cell">
+      <div className="fs-chart-head"><span className="fs-chart-title">연도별 {mLabel}</span></div>
+      <div className="fs-hbars">
+        {yearlyBars.list.map((b, i) => (
+          <HBar key={b.label} label={b.label} value={b.value} scale={yearlyBars.scale} color={b.color} delay={i * ANIM.stagger} />
+        ))}
+      </div>
+    </div>
+  );
+  const trendCell = (
+    <div className="fs-cell">
+      <div className="fs-chart-head">
+        <span className="fs-chart-title">연도별 월별 {mLabel} 추이</span>
+        <span className="fs-chart-unit">단위: 억원{trend.compress ? " · 음수 구간 축약" : ""}</span>
+      </div>
+      <div className="fs-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart key={animKey} data={trend.data} margin={{ top: 8, right: narrow ? 2 : 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke={C.grid} vertical={false} />
+            <XAxis dataKey="month" tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} interval={0} tickMargin={4} />
+            <YAxis tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} width={axisW}
+              ticks={trend.ticks} domain={trend.domain} tickFormatter={axisFmt} interval={0} />
+            <Tooltip content={<ChartTip />} />
+            <Legend iconType="plainline" iconSize={narrow ? 10 : 14} wrapperStyle={{ fontSize: narrow ? 9.5 : 11, color: C.tick }} />
+            <ReferenceLine y={0} stroke={C.tick} strokeOpacity={0.6} />
+            {trend.compress && <Customized component={<AxisBreak y={trend.breakY} bg={C.cellBg} stroke={C.tick} axisW={axisW} />} />}
+            {PAST_YEARS.map((y, i) => (
+              <Line key={y} type="linear" dataKey={`${y}년`} name={`${y}년 실적`} stroke={yearColor(i)} strokeWidth={1.8}
+                dot={{ r: narrow ? 2 : 2.5, fill: yearColor(i), strokeWidth: 0 }} activeDot={{ r: 4 }} />
             ))}
-          </div>
-        </div>
+            <Line type="linear" dataKey={`${CUR}년 목표`} name={`${CUR}년 목표`} stroke={C.planSoft} strokeWidth={2} strokeDasharray="5 4"
+              dot={{ r: narrow ? 2 : 2.5, fill: C.planSoft, strokeWidth: 0 }} activeDot={{ r: 4 }} />
+            <Line type="linear" dataKey={`${CUR}년 실적`} name={`${CUR}년 실적`} stroke={C.actual} strokeWidth={2.5}
+              dot={{ r: narrow ? 2.5 : 3, fill: C.actual, strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+  // 금융 통합 전용: 계열사별 연간 목표 대비 달성률 (막대 높이 = 목표 대비 비율, 값·달성률 직접 표기)
+  const companyRateCell = (
+    <div className="fs-cell">
+      <div className="fs-chart-head">
+        <span className="fs-chart-title">계열사별 {mLabel} 목표 달성률</span>
+        <span className="fs-chart-unit">좌축 KS(조) · 우축 KS 외(억){narrow ? " · 막대 위 숫자 단위 동일" : ""} · 달성률 = 누적 실적 ÷ 연간 목표</span>
+      </div>
+      <RateColumns
+        items={rows.map((c) => { const p = metric === "profit" ? c.p : c.r; return { id: c.id, plan: p.annualPlan, cum: p.ytdPlan, actual: p.ytdActual, ratio: p.progress, st: statusOf(p.progress, p.ytdActual, p.annualPlan) }; })}
+        planColor={C.plan} actColor={C.actual} narrow={narrow} onPick={go} />
+      <div className="fs-hbars-legend fs-rc-legend">
+        <span><i className="sw outline" style={{ "--c": C.plan }} />연간 목표</span>
+        <span><i className="sw" style={{ "--c": C.plan }} />누적 목표</span>
+        <span><i className="sw" style={{ "--c": C.actual }} />누적 실적</span>
+        <span><i className="sw dash" style={{ "--c": C.plan }} />연간 목표 높이</span>
+        <span>막대 위: 달성률 / 연간 목표 · 누적 실적</span>
+      </div>
+    </div>
+  );
+  const isGroup = entity === "GROUP";
 
-        <div className="fs-cell">
-          <div className="fs-chart-head">
-            <span className="fs-chart-title">연도별 월별 {mLabel} 추이</span>
-            <span className="fs-chart-unit">단위: 억원{trend.compress ? " · 음수 구간 축약" : ""}</span>
-          </div>
-          <div className="fs-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart key={animKey} data={trend.data} margin={{ top: 8, right: narrow ? 2 : 8, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke={C.grid} vertical={false} />
-                <XAxis dataKey="month" tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} interval={0} tickMargin={4} />
-                <YAxis tick={{ fill: C.tick, fontSize: tickFs }} axisLine={false} tickLine={false} width={axisW}
-                  ticks={trend.ticks} domain={trend.domain} tickFormatter={axisFmt} interval={0} />
-                <Tooltip content={<ChartTip />} />
-                <Legend iconType="plainline" iconSize={narrow ? 10 : 14} wrapperStyle={{ fontSize: narrow ? 9.5 : 11, color: C.tick }} />
-                <ReferenceLine y={0} stroke={C.tick} strokeOpacity={0.6} />
-                {trend.compress && <Customized component={<AxisBreak y={trend.breakY} bg={C.cellBg} stroke={C.tick} axisW={axisW} />} />}
-                {PAST_YEARS.map((y, i) => (
-                  <Line key={y} type="linear" dataKey={`${y}년`} name={`${y}년 실적`} stroke={yearColor(i)} strokeWidth={1.8}
-                    dot={{ r: narrow ? 2 : 2.5, fill: yearColor(i), strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                ))}
-                <Line type="linear" dataKey={`${CUR}년 목표`} name={`${CUR}년 목표`} stroke={C.planSoft} strokeWidth={2} strokeDasharray="5 4"
-                  dot={{ r: narrow ? 2 : 2.5, fill: C.planSoft, strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                <Line type="linear" dataKey={`${CUR}년 실적`} name={`${CUR}년 실적`} stroke={C.actual} strokeWidth={2.5}
-                  dot={{ r: narrow ? 2.5 : 3, fill: C.actual, strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+  const charts = (
+    <>
+      {/* Row 1: 불릿 + (금융 통합: 계열사별 달성률 / 계열사: 월별 목표 대비 실적) */}
+      <div className="fs-chart-row">
+        {bulletCell}
+        {isGroup ? companyRateCell : monthlyCell}
+      </div>
+      {/* Row 2: 연도별 가로막대 + (금융 통합: 월별 목표 대비 실적 / 계열사: 연도별 월별 추이) */}
+      <div className="fs-chart-row" style={{ marginTop: 16 }}>
+        {yearlyCell}
+        {isGroup ? monthlyCell : trendCell}
       </div>
     </>
   );
@@ -827,7 +946,7 @@ export default function FactsheetApp() {
 
       <section className="fs-panel">
         <div className="fs-panel-head slim">
-          <div className="fs-panel-title"><Bell size={16} className="fs-accent" /><h3>하이라이트</h3></div>
+          <div className="fs-panel-title"><Bell size={16} className="fs-accent" /><h3>실적 분석</h3></div>
         </div>
         <div className="fs-alerts">
           {highlights.map((h, i) => (
